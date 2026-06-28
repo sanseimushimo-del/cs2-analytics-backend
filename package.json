@@ -1,0 +1,17 @@
+{
+  "name": "cs2-analytics-backend",
+  "version": "1.0.0",
+  "description": "Backend для личного CS2 аналитического дашборда — прокси к PandaScore API и расчёт вероятностей на основе статистики",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "node-cache": "^5.1.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
