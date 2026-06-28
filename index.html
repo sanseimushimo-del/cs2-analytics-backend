@@ -19,7 +19,7 @@
   адрес, например 'https://cs2-analytics-backend.onrender.com'
   (без слэша на конце).
 -->
-<script>window.CS2_API_BASE = 'https://cs2-analytics-backend.onrender.com';</script>
+<script>window.CS2_API_BASE = 'http://localhost:3000';</script>
 
 <style>
   :root{
@@ -135,6 +135,23 @@
     line-height:1.6;
     margin-top:20px;
   }
+
+  .accuracy-bar{
+    margin-top:12px;
+    display:flex;
+    gap:18px;
+    flex-wrap:wrap;
+    align-items:center;
+    font-family:var(--font-mono);
+    font-size:0.8rem;
+    color:var(--text-dim);
+  }
+  .accuracy-bar .acc-stat{
+    border:1px solid var(--line);
+    border-radius:99px;
+    padding:5px 14px;
+  }
+  .accuracy-bar .acc-stat b{ color:var(--success); font-weight:600; }
 
   /* ============ FILTER / TABS ============ */
   .section-bar{
@@ -362,6 +379,7 @@
         финансовая рекомендация: цифры показывают, что говорит история, а не что произойдёт.
         Сайт не принимает донаты и не связан с букмекерскими сервисами.
       </div>
+      <div class="accuracy-bar" id="accuracyBar" style="display:none;"></div>
     </section>
 
     <div id="tabUpcoming">
@@ -444,8 +462,13 @@
       .then(function(data){
         state.analyzed = data.results || [];
         state.lastUpdatedAt = data.lastUpdatedAt;
-        statusDot.classList.remove('stale');
-        statusText.textContent = 'обновлено ' + formatRelative(data.lastUpdatedAt) + ' · ' + state.analyzed.length + ' матчей';
+        if (data.isStale){
+          statusDot.classList.add('stale');
+          statusText.textContent = 'данные устарели (обновлено ' + formatRelative(data.lastUpdatedAt) + ') — сервер не может получить свежие данные';
+        } else {
+          statusDot.classList.remove('stale');
+          statusText.textContent = 'обновлено ' + formatRelative(data.lastUpdatedAt) + ' · ' + state.analyzed.length + ' матчей';
+        }
         renderActiveTab();
         checkUpcomingNotifications();
       })
@@ -781,6 +804,34 @@
   loadAnalyzed();
   setInterval(loadAnalyzed, 2 * 60 * 1000);
   setInterval(checkUpcomingNotifications, 60 * 1000);
+
+  /* ====================================================================
+     Точность модели — глубина данных: честная накопленная статистика,
+     насколько часто фаворит модели по факту оказывался победителем.
+     Если сервер только запущен и историй пока нет — блок просто не
+     показывается, никаких выдуманных цифр.
+     ==================================================================== */
+  function loadAccuracy(){
+    fetch(API_BASE + '/api/accuracy')
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(data){
+        var bar = document.getElementById('accuracyBar');
+        if (!data || data.totalResolved === 0){
+          bar.style.display = 'none';
+          return;
+        }
+        var html = '<span class="acc-stat">Точность модели: <b>' + data.accuracy + '%</b> из ' + data.totalResolved + ' завершённых матчей</span>';
+        Object.keys(data.byConfidence || {}).forEach(function(label){
+          var b = data.byConfidence[label];
+          html += '<span class="acc-stat">' + label + ' уверенность: <b>' + b.accuracy + '%</b> (' + b.sample + ')</span>';
+        });
+        bar.innerHTML = html;
+        bar.style.display = 'flex';
+      })
+      .catch(function(){ /* блок точности необязателен — тихо игнорируем сбой */ });
+  }
+  loadAccuracy();
+  setInterval(loadAccuracy, 5 * 60 * 1000);
 })();
 </script>
 
