@@ -21,6 +21,8 @@
 const express = require('express');
 const cors = require('cors');
 const NodeCache = require('node-cache');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 app.use(cors());
@@ -45,6 +47,19 @@ const CSGO_BASE_URL = 'https://api.pandascore.co/csgo';
 if (!PANDASCORE_TOKEN) {
   console.warn('⚠️  PANDASCORE_TOKEN не задан. Установите переменную окружения перед запуском.');
 }
+
+// НАДЁЖНОСТЬ: необработанная ошибка в любом фоновом промисе (например,
+// внутри setInterval-цикла, не обёрнутого в try/catch на каком-то уровне)
+// по умолчанию валит весь процесс Node.js — а значит, и весь сайт для
+// всех посетителей, пока Render не перезапустит сервис. Логируем такие
+// случаи, но не даём процессу упасть из-за них. Это сеть безопасности,
+// а не замена нормальной обработки ошибок в коде.
+process.on('unhandledRejection', (reason) => {
+  console.error('Необработанный rejection (процесс продолжает работу):', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('Необработанное исключение (процесс продолжает работу):', err);
+});
 
 // ПРИМЕЧАНИЕ ПО БЕЗОПАСНОСТИ: здесь больше нет ACCESS_KEY-защиты на /api,
 // потому что эндпоинты публичного сайта (см. ниже) НЕ обращаются к
@@ -80,17 +95,45 @@ const publicState = {
 // внутренний кэш воркера, а не прямой ответ пользователю.
 const teamCache = new NodeCache({ stdTTL: 1800 });
 
-async function pandaFetch(path, params = {}, baseUrl = CSGO_BASE_URL) {
+/**
+ * Запрос к PandaScore с повторными попытками при временных сбоях.
+ * Повторяем только на сетевые ошибки и 5xx/429 (временная проблема на
+ * стороне сервера или превышение лимита) — НЕ повторяем на 401/403/404,
+ * потому что повтор того же неверного токена или неверного пути никогда
+ * не даст другой результат, только зря потратит время и квоту.
+ */
+async function pandaFetch(path, params = {}, baseUrl = CSGO_BASE_URL, attempt = 1) {
+  const MAX_ATTEMPTS = 3;
   const url = new URL(baseUrl + path);
   url.searchParams.set('token', PANDASCORE_TOKEN);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
 
-  const res = await fetch(url.toString());
+  let res;
+  try {
+    res = await fetch(url.toString());
+  } catch (networkErr) {
+    // Сетевая ошибка (DNS, обрыв соединения) — стоит повторить.
+    if (attempt < MAX_ATTEMPTS) {
+      await sleep(attempt * 1000); // 1с, затем 2с
+      return pandaFetch(path, params, baseUrl, attempt + 1);
+    }
+    throw new Error(`Сетевая ошибка при запросе к PandaScore после ${MAX_ATTEMPTS} попыток: ${networkErr.message}`);
+  }
+
   if (!res.ok) {
     const text = await res.text();
+    const retryable = res.status === 429 || res.status >= 500;
+    if (retryable && attempt < MAX_ATTEMPTS) {
+      await sleep(attempt * 1000);
+      return pandaFetch(path, params, baseUrl, attempt + 1);
+    }
     throw new Error(`PandaScore ${res.status}: ${text}`);
   }
   return res.json();
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 /* ===================== РАСЧЁТ АНАЛИТИКИ ===================== */
@@ -426,6 +469,13 @@ async function refreshCycle() {
 
     analyzed.sort((a, b) => b.confidence.score - a.confidence.score);
 
+    // Глубина данных: фиксируем текущие прогнозы для будущей сверки точности,
+    // и пробуем разрешить прогнозы по матчам, которые уже завершились
+    // (если PandaScore вернул winner_id среди свежего расписания — некоторые
+    // матчи из верхней части upcoming могли успеть закончиться между циклами).
+    analyzed.forEach(recordPrediction);
+    resolveFinishedPredictions(upcoming);
+
     publicState.upcomingMatches = upcoming;
     publicState.analyzedMatches = analyzed;
     publicState.lastUpdatedAt = new Date().toISOString();
@@ -445,6 +495,145 @@ function startBackgroundRefresh() {
   setInterval(refreshCycle, REFRESH_INTERVAL_MS);
 }
 
+// Если данные не обновлялись дольше этого порога — считаем их устаревшими
+// и явно сообщаем об этом на фронтенде, а не выдаём молча как свежие.
+// 3 интервала обновления подряд без успеха — это либо токен истёк, либо
+// PandaScore надолго недоступен; в обоих случаях честнее предупредить.
+const STALE_THRESHOLD_MS = REFRESH_INTERVAL_MS * 3;
+
+function isDataStale() {
+  if (!publicState.lastUpdatedAt) return true;
+  return Date.now() - new Date(publicState.lastUpdatedAt).getTime() > STALE_THRESHOLD_MS;
+}
+
+/* ===================== ИСТОРИЯ ПРОГНОЗОВ (глубина данных) ===================== */
+
+// Простой JSON-файл вместо отдельной БД — оправдано текущим масштабом
+// (один процесс, не миллионы записей). Если проект вырастет, это легко
+// заменить на настоящую БД без изменения остального кода: вся работа
+// с историей идёт через четыре функции ниже.
+const HISTORY_FILE = path.join(__dirname, 'prediction-history.json');
+const MAX_HISTORY_RECORDS = 5000; // защита от неограниченного роста файла
+
+function loadHistory() {
+  try {
+    if (!fs.existsSync(HISTORY_FILE)) return [];
+    const raw = fs.readFileSync(HISTORY_FILE, 'utf-8');
+    return JSON.parse(raw);
+  } catch (e) {
+    console.error('Не удалось прочитать историю прогнозов, начинаем с пустой:', e.message);
+    return [];
+  }
+}
+
+function saveHistory(history) {
+  try {
+    const trimmed = history.slice(-MAX_HISTORY_RECORDS);
+    fs.writeFileSync(HISTORY_FILE, JSON.stringify(trimmed), 'utf-8');
+  } catch (e) {
+    // Ошибка записи на диск (например, на бесплатном Render файловая
+    // система эфемерна и сбрасывается при перезапуске) не должна валить
+    // сервис — история точности это приятное дополнение, не критичный путь.
+    console.error('Не удалось сохранить историю прогнозов:', e.message);
+  }
+}
+
+/**
+ * Записывает прогноз матча в историю один раз — повторные вызовы для
+ * того же matchId обновляют запись (вероятность могла измениться по
+ * мере поступления новых данных), а не плодят дубликаты.
+ */
+function recordPrediction(analysis) {
+  const history = loadHistory();
+  const existing = history.findIndex(r => r.matchId === analysis.match.id);
+  const record = {
+    matchId: analysis.match.id,
+    teamA: analysis.teamA.name,
+    teamB: analysis.teamB.name,
+    beginAt: analysis.match.beginAt,
+    predictedProbA: analysis.probability.teamA,
+    predictedProbB: analysis.probability.teamB,
+    confidence: analysis.confidence.score,
+    recordedAt: new Date().toISOString(),
+    resolved: false,
+    actualWinner: null,
+  };
+  if (existing >= 0) history[existing] = record;
+  else history.push(record);
+  saveHistory(history);
+}
+
+/**
+ * Сверяет ранее записанные, но ещё не разрешённые прогнозы с фактическим
+ * результатом — раз матч завершился, у PandaScore появится winner_id.
+ * Считает только матчи, которые сами недавно были в нашем рабочем наборе
+ * (через teamCache), без отдельных дополнительных запросов к PandaScore —
+ * не хотим тратить лимит только на ретроспективную сверку.
+ */
+function resolveFinishedPredictions(recentlySeenMatches) {
+  const history = loadHistory();
+  let changed = false;
+
+  recentlySeenMatches.forEach(m => {
+    if (m.winner_id == null) return; // матч ещё не завершён
+    const record = history.find(r => r.matchId === m.id && !r.resolved);
+    if (!record) return;
+
+    const winnerName = m.winner_id === m.opponents?.[0]?.opponent?.id
+      ? m.opponents[0].opponent.name
+      : m.opponents?.[1]?.opponent?.name || null;
+
+    record.resolved = true;
+    record.actualWinner = winnerName;
+    // Был ли фаворит модели (более высокая вероятность) реальным победителем
+    record.modelWasCorrect = (record.predictedProbA >= record.predictedProbB)
+      ? (record.teamA === winnerName)
+      : (record.teamB === winnerName);
+    changed = true;
+  });
+
+  if (changed) saveHistory(history);
+}
+
+/**
+ * Агрегированная точность модели по всем разрешённым прогнозам — честная
+ * метрика "из скольких сделанных прогнозов фаворит модели победил".
+ */
+function computeAccuracyStats() {
+  const history = loadHistory();
+  const resolved = history.filter(r => r.resolved);
+  if (resolved.length === 0) {
+    return { totalResolved: 0, accuracy: null, byConfidence: {} };
+  }
+
+  const correct = resolved.filter(r => r.modelWasCorrect).length;
+
+  // Точность отдельно по уровням уверенности — проверяет саму логику
+  // confidence score: высокая уверенность ДОЛЖНА давать более высокую
+  // точность, иначе сам confidence score плохо откалиброван.
+  const buckets = { 'высокая': [], 'средняя': [], 'низкая': [] };
+  resolved.forEach(r => {
+    const bucket = r.confidence >= 70 ? 'высокая' : r.confidence >= 40 ? 'средняя' : 'низкая';
+    buckets[bucket].push(r.modelWasCorrect);
+  });
+
+  const byConfidence = {};
+  Object.entries(buckets).forEach(([label, arr]) => {
+    if (arr.length > 0) {
+      byConfidence[label] = {
+        sample: arr.length,
+        accuracy: Math.round((arr.filter(Boolean).length / arr.length) * 100),
+      };
+    }
+  });
+
+  return {
+    totalResolved: resolved.length,
+    accuracy: Math.round((correct / resolved.length) * 100),
+    byConfidence,
+  };
+}
+
 /* ===================== ЭНДПОИНТЫ (только чтение из publicState) ===================== */
 
 app.get('/api/matches/upcoming', (req, res) => {
@@ -462,6 +651,7 @@ app.get('/api/matches/analyzed', (req, res) => {
     results: publicState.analyzedMatches,
     lastUpdatedAt: publicState.lastUpdatedAt,
     nextUpdateInMs: REFRESH_INTERVAL_MS,
+    isStale: isDataStale(),
   });
 });
 
@@ -482,7 +672,18 @@ app.get('/api/status', (req, res) => {
     lastError: publicState.lastError,
     matchesTracked: publicState.analyzedMatches.length,
     refreshIntervalMs: REFRESH_INTERVAL_MS,
+    isStale: isDataStale(),
   });
+});
+
+// ВАЖНАЯ ОГОВОРКА: на бесплатном тире Render файловая система эфемерна —
+// при каждом передеплое или перезапуске сервиса файл с историей обнулится.
+// История точности копится только между перезапусками, это не постоянное
+// хранилище. Для настоящей долговременной истории нужна внешняя БД
+// (например бесплатный тир PostgreSQL на Render) — не реализовано здесь,
+// чтобы не усложнять архитектуру без явного запроса.
+app.get('/api/accuracy', (req, res) => {
+  res.json(computeAccuracyStats());
 });
 
 app.get('/health', (req, res) => res.json({ ok: true }));
