@@ -3,22 +3,38 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CS2 Analytics — статистика и аналитика матчей</title>
+<title>CS2 Analytics — статистика и аналитика матчей CS2</title>
 <meta name="description" content="Публичная аналитика предстоящих матчей CS2: форма команд, личные встречи, статистическая оценка вероятного исхода. Избранное и уведомления.">
+<meta name="keywords" content="CS2, Counter-Strike 2, CS2 аналитика, CS2 прогнозы, CS2 статистика, CS2 матчи, киберспорт аналитика">
+
+<!-- Open Graph (для красивых ссылок в Telegram, VK, Discord) -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="CS2 Analytics — статистика и аналитика матчей">
+<meta property="og:description" content="Оценка вероятного исхода матчей CS2 на основе публичных данных. Форма команд, личные встречи, тренды.">
+<meta property="og:locale" content="ru_RU">
+<meta property="og:locale:alternate" content="en_US">
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="CS2 Analytics — статистика и аналитика матчей">
+<meta name="twitter:description" content="Оценка вероятного исхода матчей CS2 на основе публичных данных.">
+
+<!-- Schema.org (Микроразметка для поисковиков) -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "CS2 Analytics",
+  "url": "https://yourdomain.com",
+  "description": "Public analytics for upcoming CS2 matches.",
+  "inLanguage": ["ru", "en"]
+}
+</script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Teko:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
-<!--
-  =======================================================================
-  НАСТРОЙКА АДРЕСА СЕРВЕРА — единственное, что нужно поменять перед деплоем
-  =======================================================================
-  Сейчас здесь стоит адрес для локального теста (localhost:3000).
-  После деплоя backend на Render замените строку ниже на ваш реальный
-  адрес, например 'https://cs2-analytics-backend.onrender.com'
-  (без слэша на конце).
--->
 <script>window.CS2_API_BASE = 'https://cs2-analytics-backend.onrender.com';</script>
 
 <style>
@@ -88,7 +104,7 @@
   }
   @keyframes blip{ 0%,100%{ opacity:1; } 50%{ opacity:0.4; } }
 
-  .navlinks{ display:flex; gap:8px; }
+  .navlinks{ display:flex; gap:8px; align-items:center; }
   .navtab{
     font-family:var(--font-mono);
     font-size:0.82rem;
@@ -375,8 +391,9 @@
   <nav class="wrap">
     <span class="logo"><span class="blip"></span>CS2 ANALYTICS</span>
     <div class="navlinks">
-      <button class="navtab active" data-tab="upcoming">Матчи</button>
-      <button class="navtab" data-tab="favorites">Избранное <span id="favCount"></span></button>
+      <button class="navtab active" data-tab="upcoming" data-i18n="nav_matches">Матчи</button>
+      <button class="navtab" data-tab="favorites" data-i18n="nav_favorites">Избранное <span id="favCount"></span></button>
+      <button class="navtab" id="langToggle" style="border-color: var(--line);">EN</button>
     </div>
   </nav>
 </header>
@@ -386,15 +403,15 @@
 
     <section class="hero">
       <div class="hero-top">
-        <h1>Аналитика <span class="accent">матчей CS2</span></h1>
+        <h1 data-i18n="hero_title">Аналитика <span class="accent">матчей CS2</span></h1>
         <span class="status-line">
           <span class="status-dot" id="statusDot"></span>
-          <span id="statusText">подключение…</span>
+          <span id="statusText" data-i18n="status_connecting">подключение…</span>
         </span>
       </div>
-      <div class="disclaimer-bar">
+      <div class="disclaimer-bar" data-i18n="disclaimer">
         Статистическая оценка вероятного исхода на основе публичных данных — форма команд,
-        личные встречи, разница раундов, тренд формы. Это не инсайдерская информация и не
+        личные встречи, разницараундов, тренд формы. Это не инсайдерская информация и не
         финансовая рекомендация: цифры показывают, что говорит история, а не что произойдёт.
         Сайт не принимает донаты и не связан с букмекерскими сервисами.
       </div>
@@ -403,21 +420,21 @@
 
     <div id="tabUpcoming">
       <div class="section-bar">
-        <span class="section-title"><span class="bar"></span>Ближайшие матчи</span>
+        <span class="section-title"><span class="bar"></span><span data-i18n="upcoming_matches">Ближайшие матчи</span></span>
         <div class="filter-row" id="filterRow">
-          <button class="filter-chip active" data-filter="all">Все</button>
-          <button class="filter-chip" data-filter="high">Высокая уверенность</button>
-          <button class="filter-chip" data-filter="favorites-only">Только избранные</button>
+          <button class="filter-chip active" data-filter="all" data-i18n="filter_all">Все</button>
+          <button class="filter-chip" data-filter="high" data-i18n="filter_high">Высокая уверенность</button>
+          <button class="filter-chip" data-filter="favorites-only" data-i18n="filter_fav_only">Только избранные</button>
         </div>
       </div>
       <div class="match-grid" id="matchGrid">
-        <div class="loading-row">Загрузка расписания…</div>
+        <div class="loading-row" data-i18n="loading">Загрузка расписания…</div>
       </div>
     </div>
 
     <div id="tabFavorites" style="display:none;">
       <div class="section-bar">
-        <span class="section-title"><span class="bar"></span>Мои избранные матчи</span>
+        <span class="section-title"><span class="bar"></span><span data-i18n="my_favorites">Мои избранные матчи</span></span>
       </div>
       <div class="match-grid" id="favoritesGrid"></div>
     </div>
@@ -426,7 +443,7 @@
 </main>
 
 <footer>
-  <div class="wrap">CS2 Analytics · данные предоставлены PandaScore · обновляется автоматически каждые 15 минут</div>
+  <div class="wrap" data-i18n="footer_text">CS2 Analytics · данные предоставлены PandaScore · обновляется автоматически каждые 15 минут</div>
 </footer>
 
 <div id="toast"></div>
@@ -440,11 +457,125 @@
      ==================================================================== */
   var API_BASE = window.CS2_API_BASE || 'http://localhost:3000';
 
-  var STORAGE_KEYS = { favorites: 'cs2_favorites', notify: 'cs2_notify_subscriptions' };
+  var STORAGE_KEYS = { favorites: 'cs2_favorites', notify: 'cs2_notify_subscriptions', lang: 'cs2_lang' };
 
   /* ====================================================================
-     localStorage helpers — избранное и подписки на уведомления живут
-     только в браузере конкретного посетителя, без регистрации и сервера.
+     ЛОКАЛИЗАЦИЯ (i18n)
+     ==================================================================== */
+  var translations = {
+    'ru': {
+      nav_matches: 'Матчи',
+      nav_favorites: 'Избранное ',
+      hero_title: 'Аналитика <span class="accent">матчей CS2</span>',
+      status_connecting: 'подключение…',
+      disclaimer: 'Статистическая оценка вероятного исхода на основе публичных данных — форма команд, личные встречи, разница раундов, тренд формы. Это не инсайдерская информация и не финансовая рекомендация: цифры показывают, что говорит история, а не что произойдёт. Сайт не принимает донаты и не связан с букмекерскими сервисами.',
+      upcoming_matches: 'Ближайшие матчи',
+      my_favorites: 'Мои избранные матчи',
+      filter_all: 'Все',
+      filter_high: 'Высокая уверенность',
+      filter_fav_only: 'Только избранные',
+      loading: 'Загрузка расписания…',
+      footer_text: 'CS2 Analytics · данные предоставлены PandaScore · обновляется автоматически каждые 15 минут',
+      no_matches_filter: 'Нет матчей по выбранному фильтру',
+      no_favorites: 'Пока нет избранных матчей — нажмите ☆ на любой карточке в разделе «Матчи», чтобы добавить',
+      status_updated: 'обновлено',
+      status_stale: 'данные устарели (обновлено',
+      status_no_connection: 'нет связи с сервером:',
+      status_server_error: 'Не удалось загрузить данные. Проверьте, что backend-сервер запущен и доступен по адресу',
+      notify_on: '🔔 включено',
+      notify_off: '🔕 напомнить',
+      notify_disabled: 'Напоминание отключено',
+      notify_enabled: 'Напомним за 10 минут до начала матча',
+      notify_blocked: 'Уведомления заблокированы в браузере — разрешите их в настройках сайта',
+      notify_starting: 'начинается через 10 минут',
+      notify_match_soon: 'Матч скоро начнётся',
+      conf_high: 'высокая',
+      conf_mid: 'средняя',
+      conf_low: 'низкая — мало данных или близкий матч',
+      date_not_set: 'дата не указана',
+      map_played: 'сыграна',
+      map_not_played: 'не сыграна',
+      map_label: 'Карта',
+      winrate_label: 'Винрейт (посл.',
+      rounds_diff: 'Разница раундов',
+      h2h_label: 'Личные встречи',
+      no_data: 'нет данных',
+      h2h_history_title: 'Динамика личных встреч',
+      date_unknown: 'дата неизвестна',
+      confidence_label: 'Достоверность:',
+      form_stable: 'форма стабильна',
+      form_up: '% к форме',
+      form_down: '% к форме'
+    },
+    'en': {
+      nav_matches: 'Matches',
+      nav_favorites: 'Favorites ',
+      hero_title: 'CS2 <span class="accent">Match Analytics</span>',
+      status_connecting: 'connecting…',
+      disclaimer: 'Statistical evaluation of the likely outcome based on public data — team form, head-to-head, round difference, form trend. This is not insider information and not financial advice: the numbers show what history says, not what will happen. The site does not accept donations and is not affiliated with betting services.',
+      upcoming_matches: 'Upcoming Matches',
+      my_favorites: 'My Favorite Matches',
+      filter_all: 'All',
+      filter_high: 'High confidence',
+      filter_fav_only: 'Favorites only',
+      loading: 'Loading schedule…',
+      footer_text: 'CS2 Analytics · data provided by PandaScore · updates automatically every 15 minutes',
+      no_matches_filter: 'No matches for the selected filter',
+      no_favorites: 'No favorite matches yet — click ☆ on any card in the "Matches" section to add',
+      status_updated: 'updated',
+      status_stale: 'data is stale (updated',
+      status_no_connection: 'no connection to server:',
+      status_server_error: 'Failed to load data. Make sure the backend server is running and available at',
+      notify_on: '🔔 on',
+      notify_off: '🔕 remind',
+      notify_disabled: 'Notification disabled',
+      notify_enabled: 'We will remind you 10 minutes before the match starts',
+      notify_blocked: 'Notifications are blocked in your browser — allow them in site settings',
+      notify_starting: 'starts in 10 minutes',
+      notify_match_soon: 'Match starts soon',
+      conf_high: 'high',
+      conf_mid: 'medium',
+      conf_low: 'low — not enough data or close match',
+      date_not_set: 'date not set',
+      map_played: 'played',
+      map_not_played: 'not played',
+      map_label: 'Map',
+      winrate_label: 'Winrate (last ',
+      rounds_diff: 'Round difference',
+      h2h_label: 'Head-to-head',
+      no_data: 'no data',
+      h2h_history_title: 'Head-to-head dynamics',
+      date_unknown: 'date unknown',
+      confidence_label: 'Confidence:',
+      form_stable: 'form is stable',
+      form_up: '% to form',
+      form_down: '% to form'
+    }
+  };
+
+  var currentLang = localStorage.getItem(STORAGE_KEYS.lang) || 'ru';
+
+  function applyTranslations() {
+    document.querySelectorAll('[data-i18n]').forEach(function(el) {
+      var key = el.getAttribute('data-i18n');
+      if (translations[currentLang] && translations[currentLang][key]) {
+        el.innerHTML = translations[currentLang][key];
+      }
+    });
+    document.documentElement.lang = currentLang;
+    document.getElementById('langToggle').textContent = currentLang === 'ru' ? 'EN' : 'RU';
+  }
+
+  document.getElementById('langToggle').addEventListener('click', function() {
+    currentLang = currentLang === 'ru' ? 'en' : 'ru';
+    localStorage.setItem(STORAGE_KEYS.lang, currentLang);
+    applyTranslations();
+    renderActiveTab(); // Перерисовываем карточки, чтобы перевести и их
+    loadAccuracy();
+  });
+
+  /* ====================================================================
+     localStorage helpers
      ==================================================================== */
   function loadSet(key){
     try {
@@ -457,7 +588,7 @@
   }
 
   var favorites = loadSet(STORAGE_KEYS.favorites);
-  var notifySubs = loadSet(STORAGE_KEYS.notify); // хранит "matchId|beginAtISO"
+  var notifySubs = loadSet(STORAGE_KEYS.notify);
 
   var state = { analyzed: [], lastUpdatedAt: null, activeFilter: 'all', expandedId: null };
 
@@ -468,14 +599,12 @@
   var favCountEl = document.getElementById('favCount');
 
   /* ====================================================================
-     Загрузка предрассчитанной аналитики (фоновый воркер сервера уже
-     всё посчитал — этот fetch ничего не стоит в смысле квоты PandaScore,
-     сколько угодно посетителей читают один и тот же общий результат)
+     Загрузка предрассчитанной аналитики
      ==================================================================== */
   function loadAnalyzed(){
     fetch(API_BASE + '/api/matches/analyzed')
       .then(function(r){
-        if (!r.ok) return r.json().then(function(e){ throw new Error(e.error || 'ошибка сервера'); });
+        if (!r.ok) return r.json().then(function(e){ throw new Error(e.error || 'server error'); });
         return r.json();
       })
       .then(function(data){
@@ -483,50 +612,60 @@
         state.lastUpdatedAt = data.lastUpdatedAt;
         if (data.isStale){
           statusDot.classList.add('stale');
-          statusText.textContent = 'данные устарели (обновлено ' + formatRelative(data.lastUpdatedAt) + ') — сервер не может получить свежие данные';
+          statusText.textContent = translations[currentLang].status_stale + ' ' + formatRelative(data.lastUpdatedAt) + ') — server cannot fetch fresh data';
         } else {
           statusDot.classList.remove('stale');
-          statusText.textContent = 'обновлено ' + formatRelative(data.lastUpdatedAt) + ' · ' + state.analyzed.length + ' матчей';
+          statusText.textContent = translations[currentLang].status_updated + ' ' + formatRelative(data.lastUpdatedAt) + ' · ' + state.analyzed.length + ' matches';
         }
         renderActiveTab();
         checkUpcomingNotifications();
       })
       .catch(function(e){
         statusDot.classList.add('stale');
-        statusText.textContent = 'нет связи с сервером: ' + e.message;
-        matchGrid.innerHTML = '<div class="empty-row">Не удалось загрузить данные. Проверьте, что backend-сервер запущен и доступен по адресу ' + API_BASE + '</div>';
+        statusText.textContent = translations[currentLang].status_no_connection + ' ' + e.message;
+        matchGrid.innerHTML = '<div class="empty-row">' + translations[currentLang].status_server_error + ' ' + API_BASE + '</div>';
       });
   }
 
   function formatRelative(iso){
-    if (!iso) return 'недавно';
+    if (!iso) return currentLang === 'ru' ? 'недавно' : 'recently';
     var diffMin = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
-    if (diffMin < 1) return 'только что';
-    if (diffMin === 1) return '1 минуту назад';
-    if (diffMin < 60) return diffMin + ' минут назад';
-    return Math.round(diffMin/60) + ' ч назад';
+    if (diffMin < 1) return currentLang === 'ru' ? 'только что' : 'just now';
+    if (diffMin === 1) return currentLang === 'ru' ? '1 минуту назад' : '1 min ago';
+    if (diffMin < 60) return diffMin + (currentLang === 'ru' ? ' минут назад' : ' mins ago');
+    return Math.round(diffMin/60) + (currentLang === 'ru' ? ' ч назад' : 'h ago');
   }
 
   function formatDate(iso){
-    if (!iso) return 'дата не указана';
+    if (!iso) return translations[currentLang].date_not_set;
     var d = new Date(iso);
-    return d.toLocaleString('ru-RU', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+    return d.toLocaleString(currentLang === 'ru' ? 'ru-RU' : 'en-US', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
   }
 
   function confClassFor(label){
+    // Лейблы приходят с сервера на русском, поэтому для классов оставляем проверку по-русски
     if (label.indexOf('высок') === 0) return 'high';
     if (label.indexOf('сред') === 0) return 'mid';
     return 'low';
   }
 
+  function translateConfLabel(label) {
+    // Сервер присылает лейблы на русском, переводим для UI
+    if (label.indexOf('высок') === 0) return translations[currentLang].conf_high;
+    if (label.indexOf('сред') === 0) return translations[currentLang].conf_mid;
+    if (label.indexOf('низк') === 0) return translations[currentLang].conf_low;
+    return label;
+  }
+
   /* ====================================================================
-     Рендер карточки матча (используется и в основном списке, и в Избранном)
+     Рендер карточки матча
      ==================================================================== */
   function matchCardHtml(m){
     var isFav = favorites.has(String(m.match.id));
     var subKey = m.match.id + '|' + m.match.beginAt;
     var isSubscribed = notifySubs.has(subKey);
     var confClass = confClassFor(m.confidence.label);
+    var confLabel = translateConfLabel(m.confidence.label);
 
     return (
       '<div class="match-card" data-id="' + m.match.id + '">' +
@@ -536,14 +675,14 @@
             '<span class="vs-sep">VS</span>' +
             '<span class="team-name" style="color:var(--ct-side)">' + m.teamB.name + '</span>' +
           '</div>' +
-          '<button class="fav-btn ' + (isFav ? 'active' : '') + '" data-action="fav" data-id="' + m.match.id + '" aria-label="В избранное">' + (isFav ? '★' : '☆') + '</button>' +
+          '<button class="fav-btn ' + (isFav ? 'active' : '') + '" data-action="fav" data-id="' + m.match.id + '" aria-label="Favorite">' + (isFav ? '★' : '☆') + '</button>' +
         '</div>' +
         '<div class="match-meta-row">' +
           '<span class="match-meta">' + (m.match.league || '') + ' · ' + formatDate(m.match.beginAt) + '</span>' +
-          '<span class="conf-pill ' + confClass + '">' + m.confidence.score + ' · ' + m.confidence.label + '</span>' +
+          '<span class="conf-pill ' + confClass + '">' + m.confidence.score + ' · ' + confLabel + '</span>' +
           '<span class="mini-prob">' + m.probability.teamA + '% / ' + m.probability.teamB + '%</span>' +
           '<button class="notify-btn ' + (isSubscribed ? 'active' : '') + '" data-action="notify" data-id="' + m.match.id + '" data-begin="' + m.match.beginAt + '">' +
-            (isSubscribed ? '🔔 включено' : '🔕 напомнить') +
+            (isSubscribed ? translations[currentLang].notify_on : translations[currentLang].notify_off) +
           '</button>' +
         '</div>' +
         '<div class="analysis-body" id="analysis-' + m.match.id + '">' + analysisBodyHtml(m) + '</div>' +
@@ -555,12 +694,13 @@
     var ts = m.tournamentStrength || {};
     var pctA = m.probability.teamA, pctB = m.probability.teamB;
     var confClass = confClassFor(m.confidence.label);
+    var confLabel = translateConfLabel(m.confidence.label);
 
     var tournamentStrip =
       '<div class="tournament-strip">' +
         (ts.tierLabel ? '<span class="tag">' + ts.tierLabel + '</span>' : '') +
         (ts.format ? '<span class="tag">' + ts.format + '</span>' : '') +
-        (ts.prizepoolAmount ? '<span class="tag">приз ' + ts.prizepoolAmount.toLocaleString('ru-RU') + ' $</span>' : '') +
+        (ts.prizepoolAmount ? '<span class="tag">prize ' + ts.prizepoolAmount.toLocaleString(currentLang === 'ru' ? 'ru-RU' : 'en-US') + ' $</span>' : '') +
         (ts.region ? '<span class="tag">' + ts.region + '</span>' : '') +
       '</div>';
 
@@ -568,7 +708,7 @@
     if (m.match.maps && m.match.maps.length){
       mapsHtml = '<div class="maps-row">' + m.match.maps.map(function(g, i){
         var cls = g.winnerIsTeamA === true ? 't' : g.winnerIsTeamA === false ? 'ct' : '';
-        var label = 'Карта ' + (g.position || (i+1)) + (g.status === 'finished' ? ' · сыграна' : ' · не сыграна');
+        var label = translations[currentLang].map_label + ' ' + (g.position || (i+1)) + (g.status === 'finished' ? ' · ' + translations[currentLang].map_played : ' · ' + translations[currentLang].map_not_played);
         return '<span class="map-chip ' + cls + '">' + label + '</span>';
       }).join('') + '</div>';
     }
@@ -581,7 +721,7 @@
         '<div class="power-team right"><div class="power-pct">' + pctB + '%</div>' + momentumTag(m.teamB.form) + '</div>' +
       '</div>' +
       '<div class="power-bar"><div class="fill-t" style="width:' + pctA + '%"></div><div class="fill-ct" style="width:' + pctB + '%"></div></div>' +
-      '<div class="confidence-line">Достоверность: <span class="badge ' + confClass + '">' + m.confidence.score + '/100 · ' + m.confidence.label + '</span></div>' +
+      '<div class="confidence-line">' + translations[currentLang].confidence_label + ' <span class="badge ' + confClass + '">' + m.confidence.score + '/100 · ' + confLabel + '</span></div>' +
       '<div class="stats-grid">' +
         statCard(m.teamA, m.headToHead, true) +
         statCard(m.teamB, m.headToHead, false) +
@@ -596,7 +736,7 @@
     var pct = Math.round(form.momentum * 100);
     var cls = pct > 5 ? 'up' : pct < -5 ? 'down' : 'flat';
     var arrow = cls === 'up' ? '↑' : cls === 'down' ? '↓' : '→';
-    var text = cls === 'flat' ? 'форма стабильна' : (pct > 0 ? '+' : '') + pct + '% к форме';
+    var text = cls === 'flat' ? translations[currentLang].form_stable : (pct > 0 ? '+' : '') + pct + translations[currentLang]['form_' + cls];
     return '<div><span class="momentum-tag ' + cls + '">' + arrow + ' ' + text + '</span></div>';
   }
 
@@ -613,10 +753,10 @@
     return (
       '<div class="stat-card">' +
         '<div class="label">' + team.name + '</div>' +
-        '<div class="row"><span>Винрейт (посл. ' + f.sample + ')</span><span class="v">' + Math.round(f.winRate*100) + '%</span></div>' +
+        '<div class="row"><span>' + translations[currentLang].winrate_label + f.sample + ')</span><span class="v">' + Math.round(f.winRate*100) + '%</span></div>' +
         formStrip(f.recentForm) +
-        '<div class="row"><span>Разница раундов</span><span class="v">' + (f.roundDataAvailable ? (f.avgRoundDiff > 0 ? '+' : '') + f.avgRoundDiff.toFixed(1) : 'нет данных') + '</span></div>' +
-        '<div class="row"><span>Личные встречи</span><span class="v">' + (h2h.sample > 0 ? h2h.sample : 'нет данных') + '</span></div>' +
+        '<div class="row"><span>' + translations[currentLang].rounds_diff + '</span><span class="v">' + (f.roundDataAvailable ? (f.avgRoundDiff > 0 ? '+' : '') + f.avgRoundDiff.toFixed(1) : translations[currentLang].no_data) + '</span></div>' +
+        '<div class="row"><span>' + translations[currentLang].h2h_label + '</span><span class="v">' + (h2h.sample > 0 ? h2h.sample : translations[currentLang].no_data) + '</span></div>' +
       '</div>'
     );
   }
@@ -625,11 +765,11 @@
     if (!h2h.history || h2h.history.length === 0) return '';
     return (
       '<div class="h2h-history">' +
-        '<div class="h2h-title">Динамика личных встреч</div>' +
+        '<div class="h2h-title">' + translations[currentLang].h2h_history_title + '</div>' +
         h2h.history.map(function(m){
           var winnerName = m.winnerIsTeamA ? nameA : nameB;
           var resCls = m.winnerIsTeamA ? 't' : 'ct';
-          return '<div class="h2h-row"><span>' + (m.date ? formatDate(m.date) : 'дата неизвестна') + '</span><span class="res ' + resCls + '">' + winnerName + '</span></div>';
+          return '<div class="h2h-row"><span>' + (m.date ? formatDate(m.date) : translations[currentLang].date_unknown) + '</span><span class="res ' + resCls + '">' + winnerName + '</span></div>';
         }).join('') +
       '</div>'
     );
@@ -647,7 +787,7 @@
   function renderUpcoming(){
     var list = applyFilter(state.analyzed);
     if (list.length === 0){
-      matchGrid.innerHTML = '<div class="empty-row">Нет матчей по выбранному фильтру</div>';
+      matchGrid.innerHTML = '<div class="empty-row">' + translations[currentLang].no_matches_filter + '</div>';
       return;
     }
     matchGrid.innerHTML = list.map(matchCardHtml).join('');
@@ -657,7 +797,7 @@
   function renderFavorites(){
     var list = state.analyzed.filter(function(m){ return favorites.has(String(m.match.id)); });
     if (list.length === 0){
-      favoritesGrid.innerHTML = '<div class="favorites-empty">Пока нет избранных матчей — нажмите ☆ на любой карточке в разделе «Матчи», чтобы добавить</div>';
+      favoritesGrid.innerHTML = '<div class="favorites-empty">' + translations[currentLang].no_favorites + '</div>';
       return;
     }
     favoritesGrid.innerHTML = list.map(matchCardHtml).join('');
@@ -682,7 +822,7 @@
   }
 
   /* ====================================================================
-     Делегирование событий: разворот карточки, избранное, уведомления
+     Делегирование событий
      ==================================================================== */
   function handleGridClick(e){
     var favBtn = e.target.closest('[data-action="fav"]');
@@ -708,7 +848,6 @@
       var id2 = card.dataset.id;
       var body = card.querySelector('.analysis-body');
       var wasOpen = body.classList.contains('show');
-      // закрываем все остальные раскрытые карточки в этом контейнере
       card.parentElement.querySelectorAll('.analysis-body.show').forEach(function(b){ b.classList.remove('show'); });
       card.parentElement.querySelectorAll('.match-card.expanded').forEach(function(c){ c.classList.remove('expanded'); });
       if (!wasOpen){
@@ -727,14 +866,14 @@
     var key = matchId + '|' + beginAt;
     if (notifySubs.has(key)){
       notifySubs.delete(key);
-      showToast('Напоминание отключено');
+      showToast(translations[currentLang].notify_disabled);
     } else {
       requestNotifyPermission(function(granted){
         if (granted){
           notifySubs.add(key);
-          showToast('Напомним за 10 минут до начала матча');
+          showToast(translations[currentLang].notify_enabled);
         } else {
-          showToast('Уведомления заблокированы в браузере — разрешите их в настройках сайта');
+          showToast(translations[currentLang].notify_blocked);
         }
       });
     }
@@ -749,10 +888,7 @@
   }
 
   /* ====================================================================
-     Проверка: не пора ли напомнить о матче (раз в минуту, пока открыта
-     страница — это намеренное ограничение localStorage-подхода без
-     сервера: уведомление сработает только если сайт открыт во вкладке.
-     Честно сообщаем об этом пользователю в подсказке у кнопки.
+     Уведомления
      ==================================================================== */
   function checkUpcomingNotifications(){
     var now = Date.now();
@@ -767,7 +903,6 @@
         notifySubs.delete(key);
         saveSet(STORAGE_KEYS.notify, notifySubs);
       } else if (diffMs <= 0){
-        // матч уже начался — подписка больше не актуальна
         notifySubs.delete(key);
         saveSet(STORAGE_KEYS.notify, notifySubs);
       }
@@ -776,11 +911,11 @@
 
   function fireNotification(matchId, beginAt){
     var match = state.analyzed.find(function(m){ return String(m.match.id) === matchId; });
-    var title = match ? (match.teamA.name + ' vs ' + match.teamB.name) : 'Матч скоро начнётся';
+    var title = match ? (match.teamA.name + ' vs ' + match.teamB.name) : translations[currentLang].notify_match_soon;
     if ('Notification' in window && Notification.permission === 'granted'){
-      new Notification('CS2 Analytics', { body: title + ' начинается через 10 минут' });
+      new Notification('CS2 Analytics', { body: title + ' ' + translations[currentLang].notify_starting });
     }
-    showToast(title + ' — начало через 10 минут');
+    showToast(title + ' — ' + translations[currentLang].notify_starting);
   }
 
   var toastTimeout;
@@ -795,9 +930,9 @@
   /* ====================================================================
      Табы и фильтры
      ==================================================================== */
-  document.querySelectorAll('.navtab').forEach(function(tab){
+  document.querySelectorAll('.navtab[data-tab]').forEach(function(tab){
     tab.addEventListener('click', function(){
-      document.querySelectorAll('.navtab').forEach(function(t){ t.classList.remove('active'); });
+      document.querySelectorAll('.navtab[data-tab]').forEach(function(t){ t.classList.remove('active'); });
       tab.classList.add('active');
       var target = tab.dataset.tab;
       document.getElementById('tabUpcoming').style.display = target === 'upcoming' ? '' : 'none';
@@ -839,16 +974,30 @@
           bar.style.display = 'none';
           return;
         }
-        var html = '<span class="acc-stat">Точность модели: <b>' + data.accuracy + '%</b> из ' + data.totalResolved + ' завершённых матчей</span>';
+        var accLabel = currentLang === 'ru' ? 'Точность модели' : 'Model accuracy';
+        var ofLabel = currentLang === 'ru' ? 'из' : 'of';
+        var matchesLabel = currentLang === 'ru' ? 'завершённых матчей' : 'resolved matches';
+        var confLabel = currentLang === 'ru' ? 'уверенность' : 'confidence';
+        
+        var html = '<span class="acc-stat">' + accLabel + ': <b>' + data.accuracy + '%</b> ' + ofLabel + ' ' + data.totalResolved + ' ' + matchesLabel + '</span>';
+        
         Object.keys(data.byConfidence || {}).forEach(function(label){
           var b = data.byConfidence[label];
-          html += '<span class="acc-stat">' + label + ' уверенность: <b>' + b.accuracy + '%</b> (' + b.sample + ')</span>';
+          var translatedLabel = label;
+          if (label === 'высокая') translatedLabel = translations[currentLang].conf_high;
+          if (label === 'средняя') translatedLabel = translations[currentLang].conf_mid;
+          if (label === 'низкая') translatedLabel = translations[currentLang].conf_low;
+          
+          html += '<span class="acc-stat">' + translatedLabel + ' ' + confLabel + ': <b>' + b.accuracy + '%</b> (' + b.sample + ')</span>';
         });
         bar.innerHTML = html;
         bar.style.display = 'flex';
       })
       .catch(function(){ /* блок точности необязателен — тихо игнорируем сбой */ });
   }
+
+  // Применяем переводы при первой загрузке
+  applyTranslations();
   loadAccuracy();
   setInterval(loadAccuracy, 5 * 60 * 1000);
 })();
