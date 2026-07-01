@@ -490,25 +490,6 @@ async function getAccuracyStats() {
 
 /* ===================== ЭНДПОИНТЫ ===================== */
 
-app.get('/api/matches/upcoming', (req, res) => {
-  if (!publicState.lastUpdatedAt) {
-    return res.status(503).json({ error: 'Данные готовятся, обновите страницу через несколько секунд.' });
-  }
-  res.json(publicState.upcomingMatches);
-});
-
-app.get('/api/matches/analyzed', (req, res) => {
-  if (!publicState.lastUpdatedAt) {
-    return res.status(503).json({ error: 'Данные готовятся, обновите страницу через несколько секунд.' });
-  }
-  res.json({
-    results: publicState.analyzedMatches,
-    lastUpdatedAt: publicState.lastUpdatedAt,
-    nextUpdateInMs: REFRESH_INTERVAL_MS,
-    isStale: isDataStale(),
-  });
-});
-
 app.get('/api/matches/:id/analysis', (req, res) => {
   const found = publicState.analyzedMatches.find(m => String(m.match.id) === String(req.params.id));
   if (!found) {
@@ -517,7 +498,6 @@ app.get('/api/matches/:id/analysis', (req, res) => {
     });
   }
   res.json(found);
-```javascript
 });
 
 app.get('/api/status', (req, res) => {
@@ -547,4 +527,3 @@ app.listen(PORT, () => {
   console.log(`CS2 analytics backend running on port ${PORT}`);
   startBackgroundRefresh();
 });
-
