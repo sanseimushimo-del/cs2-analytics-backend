@@ -7,7 +7,11 @@
 <meta name="description" content="Публичная аналитика предстоящих матчей CS2: форма команд, личные встречи, статистическая оценка вероятного исхода. Избранное и уведомления.">
 <meta name="keywords" content="CS2, Counter-Strike 2, CS2 аналитика, CS2 прогнозы, CS2 статистика, CS2 матчи, киберспорт аналитика">
 
-<!-- Open Graph (для красивых ссылок в Telegram, VK, Discord) -->
+<!-- PWA Meta Tags -->
+<meta name="theme-color" content="#0A0E14">
+<link rel="manifest" href="manifest.json">
+
+<!-- Open Graph -->
 <meta property="og:type" content="website">
 <meta property="og:title" content="CS2 Analytics — статистика и аналитика матчей">
 <meta property="og:description" content="Оценка вероятного исхода матчей CS2 на основе публичных данных. Форма команд, личные встречи, тренды.">
@@ -19,7 +23,7 @@
 <meta name="twitter:title" content="CS2 Analytics — статистика и аналитика матчей">
 <meta name="twitter:description" content="Оценка вероятного исхода матчей CS2 на основе публичных данных.">
 
-<!-- Schema.org (Микроразметка для поисковиков) -->
+<!-- Schema.org -->
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -68,7 +72,6 @@
 
   .wrap{ max-width:1140px; margin:0 auto; padding:0 24px; }
 
-  /* subtle scanline texture, like an in-game HUD overlay */
   body::before{
     content:'';
     position:fixed; inset:0;
@@ -77,7 +80,6 @@
     z-index:0;
   }
 
-  /* ============ HEADER ============ */
   header{
     position:sticky; top:0; z-index:50;
     background:rgba(10,14,20,0.92);
@@ -119,7 +121,6 @@
   .navtab:hover{ color:var(--text); }
   .navtab.active{ color:var(--t-side); border-color:var(--t-side); background:rgba(222,155,53,0.08); }
 
-  /* ============ HERO ============ */
   .hero{ padding:56px 0 40px; }
   .hero-top{ display:flex; justify-content:space-between; align-items:flex-end; gap:24px; flex-wrap:wrap; margin-bottom:8px; }
   h1{
@@ -169,7 +170,6 @@
   }
   .accuracy-bar .acc-stat b{ color:var(--success); font-weight:600; }
 
-  /* ============ FILTER / TABS ============ */
   .section-bar{
     display:flex; justify-content:space-between; align-items:center;
     margin:40px 0 18px; flex-wrap:wrap; gap:14px;
@@ -199,7 +199,6 @@
   .filter-chip:hover{ border-color:var(--text-dim); color:var(--text); }
   .filter-chip.active{ background:var(--t-side); color:#241804; border-color:var(--t-side); }
 
-  /* ============ MATCH GRID ============ */
   .match-grid{ display:flex; flex-direction:column; gap:10px; margin-bottom:48px; }
   .match-card{
     background:var(--panel);
@@ -258,7 +257,6 @@
     padding:40px; text-align:center;
   }
 
-  /* ============ ANALYSIS PANEL (inline, expands inside card) ============ */
   .analysis-body{
     margin-top:20px; padding-top:20px;
     border-top:1px dashed var(--line);
@@ -330,14 +328,12 @@
 
   .panel-disclaimer{ font-size:0.76rem; color:var(--text-dim); text-align:center; border-top:1px solid var(--line); padding-top:14px; line-height:1.6; }
 
-  /* ============ EMPTY FAVORITES ============ */
   .favorites-empty{
     background:var(--panel); border:1px dashed var(--line); border-radius:10px;
     padding:48px 24px; text-align:center; color:var(--text-dim);
     font-family:var(--font-mono); font-size:0.85rem;
   }
 
-  /* ============ TOAST ============ */
   #toast{
     position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px);
     background:var(--panel); border:1px solid var(--ct-side); border-radius:8px;
@@ -411,7 +407,7 @@
       </div>
       <div class="disclaimer-bar" data-i18n="disclaimer">
         Статистическая оценка вероятного исхода на основе публичных данных — форма команд,
-        личные встречи, разницараундов, тренд формы. Это не инсайдерская информация и не
+        личные встречи, разница раундов, тренд формы. Это не инсайдерская информация и не
         финансовая рекомендация: цифры показывают, что говорит история, а не что произойдёт.
         Сайт не принимает донаты и не связан с букмекерскими сервисами.
       </div>
@@ -570,7 +566,7 @@
     currentLang = currentLang === 'ru' ? 'en' : 'ru';
     localStorage.setItem(STORAGE_KEYS.lang, currentLang);
     applyTranslations();
-    renderActiveTab(); // Перерисовываем карточки, чтобы перевести и их
+    renderActiveTab();
     loadAccuracy();
   });
 
@@ -643,14 +639,12 @@
   }
 
   function confClassFor(label){
-    // Лейблы приходят с сервера на русском, поэтому для классов оставляем проверку по-русски
     if (label.indexOf('высок') === 0) return 'high';
     if (label.indexOf('сред') === 0) return 'mid';
     return 'low';
   }
 
   function translateConfLabel(label) {
-    // Сервер присылает лейблы на русском, переводим для UI
     if (label.indexOf('высок') === 0) return translations[currentLang].conf_high;
     if (label.indexOf('сред') === 0) return translations[currentLang].conf_mid;
     if (label.indexOf('низк') === 0) return translations[currentLang].conf_low;
@@ -951,19 +945,14 @@
   });
 
   /* ====================================================================
-     Периодическое обновление: подтягиваем свежий результат фонового
-     воркера сервера раз в пару минут (это чтение из памяти на сервере,
-     не новый запрос к PandaScore — безопасно при любом количестве вкладок)
+     Периодическое обновление
      ==================================================================== */
   loadAnalyzed();
   setInterval(loadAnalyzed, 2 * 60 * 1000);
   setInterval(checkUpcomingNotifications, 60 * 1000);
 
   /* ====================================================================
-     Точность модели — глубина данных: честная накопленная статистика,
-     насколько часто фаворит модели по факту оказывался победителем.
-     Если сервер только запущен и историй пока нет — блок просто не
-     показывается, никаких выдуманных цифр.
+     Точность модели
      ==================================================================== */
   function loadAccuracy(){
     fetch(API_BASE + '/api/accuracy')
@@ -1000,8 +989,23 @@
   applyTranslations();
   loadAccuracy();
   setInterval(loadAccuracy, 5 * 60 * 1000);
+
+  /* ====================================================================
+     PWA: Регистрация Service Worker
+     ==================================================================== */
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+      navigator.serviceWorker.register('/sw.js').then(function(registration) {
+        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+      }, function(err) {
+        console.log('ServiceWorker registration failed: ', err);
+      });
+    });
+  }
+
 })();
 </script>
 
 </body>
 </html>
+
