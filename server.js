@@ -345,4 +345,206 @@ async function refreshCycle() {
       try {
         const result = await analyzeMatch(m.id);
         analyzed.push(result);
-        // 
+        
+        // Сохраняем прогноз в БД
+        await savePrediction({
+          id: result.match.id,
+          team1: result.teamA.name,
+          team2: result.teamB.name,
+          predictedWinner: result.probability.teamA >= result.probability.teamB ? result.teamA.name : result.teamB.name,
+          confidenceScore: result.confidence.score
+        });
+      } catch (e) {
+        console.warn(`Пропущен матч ${m.id} при фоновом обновлении: ${e.message}`);
+      }
+    }
+
+    analyzed.sort((a, b) => b.confidence.score - a.confidence.score);
+
+    // Проверяем завершенные матчи и обновляем результаты в БД
+    await resolveFinishedPredictions(upcoming);
+
+    publicState.upcomingMatches = upcoming;
+    publicState.analyzedMatches = analyzed;
+    publicState.lastUpdatedAt = new Date().toISOString();
+    publicState.lastError = null;
+  } catch (e) {
+    console.error('Ошибка фонового обновления:', e.message);
+    publicState.lastError = e.message;
+  } finally {
+    publicState.isRefreshing = false;
+  }
+}
+
+function startBackgroundRefresh() {
+  refreshCycle();
+  setInterval(refreshCycle, REFRESH_INTERVAL_MS);
+}
+
+const STALE_THRESHOLD_MS = REFRESH_INTERVAL_MS * 3;
+
+function isDataStale() {
+  if (!publicState.lastUpdatedAt) return true;
+  return Date.now() - new Date(publicState.lastUpdatedAt).getTime() > STALE_THRESHOLD_MS;
+}
+
+/* ===================== РАБОТА С БД (PostgreSQL) ===================== */
+
+async function savePrediction(matchData) {
+  const query = `
+    INSERT INTO predictions (match_id, team1, team2, predicted_winner, confidence_score)
+    VALUES ($1, $2, $3, $4, $5)
+    ON CONFLICT (match_id) DO UPDATE 
+    SET team1 = $2, team2 = $3, predicted_winner = $4, confidence_score = $5;
+  `;
+  const values = [
+    String(matchData.id), 
+    matchData.team1, 
+    matchData.team2, 
+    matchData.predictedWinner, 
+    matchData.confidenceScore
+  ];
+  
+  try {
+    await pool.query(query, values);
+  } catch (err) {
+    console.error('❌ Ошибка сохранения прогноза в БД:', err.message);
+  }
+}
+
+async function resolveFinishedPredictions(recentlySeenMatches) {
+  try {
+    for (const m of recentlySeenMatches) {
+      if (m.winner_id == null) continue;
+
+      const winnerName = m.winner_id === m.opponents?.[0]?.opponent?.id
+        ? m.opponents[0].opponent.name
+        : m.opponents?.[1]?.opponent?.name || null;
+
+      if (winnerName) {
+        await pool.query(`
+          UPDATE predictions 
+          SET resolved = TRUE, 
+              actual_winner = $1, 
+              is_correct = (predicted_winner = $1)
+          WHERE match_id = $2 AND resolved = FALSE;
+        `, [winnerName, String(m.id)]);
+      }
+    }
+  } catch (err) {
+    console.error('❌ Ошибка обновления результатов матчей в БД:', err.message);
+  }
+}
+
+async function getAccuracyStats() {
+  try {
+    const res = await pool.query(`
+      SELECT 
+        COUNT(*) as total,
+        COUNT(CASE WHEN is_correct = true THEN 1 END) as correct,
+        COUNT(CASE WHEN confidence_score >= 70 AND is_correct = true THEN 1 END) as correct_high,
+        COUNT(CASE WHEN confidence_score >= 70 THEN 1 END) as total_high,
+        COUNT(CASE WHEN confidence_score >= 40 AND confidence_score < 70 AND is_correct = true THEN 1 END) as correct_mid,
+        COUNT(CASE WHEN confidence_score >= 40 AND confidence_score < 70 THEN 1 END) as total_mid,
+        COUNT(CASE WHEN confidence_score < 40 AND is_correct = true THEN 1 END) as correct_low,
+        COUNT(CASE WHEN confidence_score < 40 THEN 1 END) as total_low
+      FROM predictions 
+      WHERE resolved = TRUE;
+    `);
+
+    const row = res.rows[0];
+    if (row.total == 0) {
+      return { totalResolved: 0, accuracy: null, byConfidence: {} };
+    }
+
+    const byConfidence = {};
+    if (row.total_high > 0) {
+      byConfidence['высокая'] = {
+        sample: row.total_high,
+        accuracy: Math.round((row.correct_high / row.total_high) * 100)
+      };
+    }
+    if (row.total_mid > 0) {
+      byConfidence['средняя'] = {
+        sample: row.total_mid,
+        accuracy: Math.round((row.correct_mid / row.total_mid) * 100)
+      };
+    }
+    if (row.total_low > 0) {
+      byConfidence['низкая'] = {
+        sample: row.total_low,
+        accuracy: Math.round((row.correct_low / row.total_low) * 100)
+      };
+    }
+
+    return {
+      totalResolved: row.total,
+      accuracy: Math.round((row.correct / row.total) * 100),
+      byConfidence
+    };
+  } catch (err) {
+    console.error('❌ Ошибка получения статистики:', err.message);
+    return { totalResolved: 0, accuracy: null, byConfidence: {} };
+  }
+}
+
+/* ===================== ЭНДПОИНТЫ ===================== */
+
+app.get('/api/matches/upcoming', (req, res) => {
+  if (!publicState.lastUpdatedAt) {
+    return res.status(503).json({ error: 'Данные готовятся, обновите страницу через несколько секунд.' });
+  }
+  res.json(publicState.upcomingMatches);
+});
+
+app.get('/api/matches/analyzed', (req, res) => {
+  if (!publicState.lastUpdatedAt) {
+    return res.status(503).json({ error: 'Данные готовятся, обновите страницу через несколько секунд.' });
+  }
+  res.json({
+    results: publicState.analyzedMatches,
+    lastUpdatedAt: publicState.lastUpdatedAt,
+    nextUpdateInMs: REFRESH_INTERVAL_MS,
+    isStale: isDataStale(),
+  });
+});
+
+app.get('/api/matches/:id/analysis', (req, res) => {
+  const found = publicState.analyzedMatches.find(m => String(m.match.id) === String(req.params.id));
+  if (!found) {
+    return res.status(404).json({
+      error: 'Этот матч пока не входит в число предрассчитанных — аналитика доступна только для топ-' + MATCHES_TO_PRERENDER + ' ближайших матчей.',
+    });
+  }
+  res.json(found);
+```javascript
+});
+
+app.get('/api/status', (req, res) => {
+  res.json({
+    lastUpdatedAt: publicState.lastUpdatedAt,
+    isRefreshing: publicState.isRefreshing,
+    lastError: publicState.lastError,
+    matchesTracked: publicState.analyzedMatches.length,
+    refreshIntervalMs: REFRESH_INTERVAL_MS,
+    isStale: isDataStale(),
+  });
+});
+
+app.get('/api/accuracy', async (req, res) => {
+  try {
+    const stats = await getAccuracyStats();
+    res.json(stats);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch accuracy' });
+  }
+});
+
+app.get('/health', (req, res) => res.json({ ok: true }));
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`CS2 analytics backend running on port ${PORT}`);
+  startBackgroundRefresh();
+});
+
