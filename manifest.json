@@ -1,0 +1,21 @@
+{
+  "name": "CS2 Analytics",
+  "short_name": "CS2 Analytics",
+  "description": "Public analytics for upcoming CS2 matches.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0A0E14",
+  "theme_color": "#0A0E14",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
