@@ -522,6 +522,11 @@ app.get('/api/accuracy', async (req, res) => {
 
 app.get('/health', (req, res) => res.json({ ok: true }));
 
+// Корневой маршрут, чтобы при прямом заходе на URL бэкенда не было 404
+app.get('/', (req, res) => {
+  res.send('CS2 Analytics Backend is running. Frontend is hosted separately.');
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`CS2 analytics backend running on port ${PORT}`);
